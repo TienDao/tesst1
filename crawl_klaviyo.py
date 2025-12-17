@@ -8,9 +8,10 @@ import time
 import re
 import requests
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
-def crawl_with_playwright(url):
-    """Crawl businesses using Playwright"""
+def crawl_with_playwright(url, max_clicks=100):
+    """Crawl businesses using Playwright with load-more functionality"""
     businesses = []
 
     with sync_playwright() as p:
@@ -23,6 +24,82 @@ def crawl_with_playwright(url):
 
         # Wait a bit for dynamic content
         time.sleep(3)
+
+        # Try to find and click "Load More" button repeatedly
+        load_more_selectors = [
+            "button:has-text('Load more')",
+            "button:has-text('Load More')",
+            "button:has-text('Show more')",
+            "button:has-text('See more')",
+            "button[class*='load']",
+            "button[class*='more']",
+            "a:has-text('Load more')",
+            "a:has-text('Load More')",
+        ]
+
+        click_count = 0
+        previous_count = 0
+
+        print("\nAttempting to load all results...")
+        while click_count < max_clicks:
+            # Try to find load more button
+            load_more_button = None
+            for selector in load_more_selectors:
+                try:
+                    load_more_button = page.query_selector(selector)
+                    if load_more_button and load_more_button.is_visible():
+                        break
+                except:
+                    continue
+
+            if not load_more_button:
+                print("No more 'Load More' button found.")
+                break
+
+            try:
+                # Check if button is enabled
+                is_disabled = load_more_button.is_disabled()
+                if is_disabled:
+                    print("'Load More' button is disabled.")
+                    break
+
+                # Click the button
+                click_count += 1
+                print(f"Click #{click_count}: Loading more results...")
+                load_more_button.click()
+
+                # Wait for content to load
+                time.sleep(2)
+                page.wait_for_load_state("networkidle", timeout=10000)
+
+                # Check if new content was loaded
+                current_selectors = [
+                    "div.partner-card",
+                    "div[class*='PartnerCard']",
+                    "div[class*='partner']",
+                    "article",
+                ]
+
+                current_count = 0
+                for selector in current_selectors:
+                    elements = page.query_selector_all(selector)
+                    if elements and len(elements) > current_count:
+                        current_count = len(elements)
+
+                print(f"  Total elements found: {current_count}")
+
+                # If count hasn't increased, we might be done
+                if current_count == previous_count:
+                    print("No new content loaded. Stopping.")
+                    break
+
+                previous_count = current_count
+
+            except Exception as e:
+                print(f"Error clicking load more button: {e}")
+                break
+
+        print(f"\nFinished loading. Total clicks: {click_count}")
 
         # Save page content for debugging
         content = page.content()
@@ -44,7 +121,7 @@ def crawl_with_playwright(url):
         for selector in possible_selectors:
             elements = page.query_selector_all(selector)
             if elements and len(elements) > 3:
-                print(f"Found {len(elements)} elements with selector: {selector}")
+                print(f"\nExtracting businesses from {len(elements)} elements using selector: {selector}")
 
                 for element in elements:
                     try:
@@ -174,8 +251,15 @@ def crawl_with_requests(url):
 
 def crawl_businesses(url):
     """Crawl businesses from Klaviyo Connect"""
-    print("Using requests + BeautifulSoup for crawling...")
-    return crawl_with_requests(url)
+    try:
+        print("Using Playwright for crawling with load-more functionality...")
+        return crawl_with_playwright(url)
+    except Exception as e:
+        print(f"\nPlaywright failed: {e}")
+        print("\nNote: To use load-more functionality, you need to install Playwright browsers:")
+        print("  Run: playwright install")
+        print("\nFalling back to requests method (will only get first page)...")
+        return crawl_with_requests(url)
 
 def main():
     url = "https://connect.klaviyo.com/?country=US&f_monthly-budget=2500-or-unsure"
