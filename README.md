@@ -5,6 +5,7 @@ Script để crawl danh sách các doanh nghiệp từ Klaviyo Connect directory
 ## Tính năng
 
 - Crawl danh sách doanh nghiệp từ Klaviyo Connect
+- **Tự động load more để lấy hết tất cả kết quả** (sử dụng Playwright)
 - Hỗ trợ filter theo quốc gia và ngân sách
 - Export kết quả ra file JSON
 - Lưu page source để debug
@@ -18,8 +19,14 @@ Script để crawl danh sách các doanh nghiệp từ Klaviyo Connect directory
 ### Cài đặt dependencies
 
 ```bash
+# Cài đặt Python packages
 pip install -r requirements.txt
+
+# Cài đặt Playwright browsers (bắt buộc để sử dụng tính năng load-more)
+playwright install
 ```
+
+**Lưu ý:** Tính năng load-more tự động yêu cầu Playwright browsers. Nếu không cài được browsers, script sẽ tự động chuyển sang chế độ requests (chỉ lấy trang đầu tiên).
 
 ## Sử dụng
 
@@ -75,21 +82,19 @@ File HTML của trang web (để debug nếu cần)
 
 ## Cách hoạt động
 
-Script sử dụng 2 phương pháp:
+Script sử dụng 2 phương pháp với auto-fallback:
 
-1. **Requests + BeautifulSoup** (mặc định):
-   - Nhanh, nhẹ
-   - Phù hợp với trang web static
-   - Ít tốn tài nguyên
+1. **Playwright** (mặc định - có load-more):
+   - **Tự động click "Load More" cho đến khi hết kết quả**
+   - Xử lý JavaScript rendering và dynamic content
+   - Lấy được toàn bộ danh sách businesses
+   - Giới hạn tối đa 100 lần click để tránh vòng lặp vô hạn
+   - Yêu cầu cài đặt browsers: `playwright install`
 
-2. **Playwright** (backup):
-   - Xử lý JavaScript rendering
-   - Phù hợp với trang web dynamic
-   - Cần cài thêm browser:
-   ```bash
-   pip install playwright
-   playwright install chromium
-   ```
+2. **Requests + BeautifulSoup** (fallback tự động):
+   - Tự động kích hoạt nếu Playwright không khả dụng
+   - Chỉ lấy được trang đầu tiên (không có load-more)
+   - Nhanh, nhẹ, ít tốn tài nguyên
 
 ## Troubleshooting
 
